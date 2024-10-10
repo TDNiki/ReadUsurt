@@ -1,5 +1,4 @@
 from requests_html import HTMLSession as Session
-from requests_html import HTMLResponse
 
 class bb_connect_Error(Exception):
     def __init__(self, *args: object) -> None:
@@ -21,7 +20,7 @@ class bb_connect:
         self.bb_link = bb_link
     
     def get_urls(self) -> list:
-        """Gets all url .xls from url directory"""
+        """Gets all excel (.xls) urls from url directory"""
         return self.__to_xld_files()
     
     def __to_xld_files(self) -> list:
