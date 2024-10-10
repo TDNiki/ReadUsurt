@@ -28,13 +28,12 @@ class bb_connect:
 
         urls = list()
         ses = Session()
-        get: HTMLResponse = ses.get(self.bb_link)
         #cur_get.html: HTML
-        elements = get.html.find(self.__FIND_PARAM)
+        elements = ses.get(self.bb_link).html.find(self.__FIND_PARAM)
 
         while len(elements):
             try:
-                link = elements[0].absolute_links.pop() #absolute_links: set; must be only one link in set
+                link: str = elements[0].absolute_links.pop() #absolute_links: set; must be only one link in set
                 if link.endswith(self.__EXT_EXCEL):
                     urls.append(link)
                 else:
