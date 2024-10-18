@@ -64,6 +64,7 @@ class ReadSchedule:
         self.__get_file(bb_link)
         self.__table = xlrd.open_workbook(self.__file_path).sheet_by_index(0)
         self.__head_parser() #additional info
+        self.__get_date_interval() # for date sort
     
     def get_all(self) -> list[Shedule]:
         """:RETURNS: list of dataclass - Shedule"""
@@ -105,7 +106,13 @@ class ReadSchedule:
         return data
     
     def __get_date_interval(self):
-
+        end_index_date_row = self.__table.nrows
+        while self.__table.cell_value(end_index_date_row, self.__DATE_COL).isspace():
+            end_index_date_row -= 1
+        
+        self.date_interval = self.__str_to_date(self.__table.cell_value(self.__START_INDEX_ROW, self.__DATE_COL), self.__year),\
+        self.__str_to_date(self.__table.cell_value(end_index_date_row, self.__DATE_COL), self.__year)
+    
     @staticmethod
     def __parse_lesson_info(cell_value: str) -> list:
         """:RETURNS: list of parsed info; (lesson_name: str, speaker_info: str, location: str, lesson_type: str)"""
