@@ -196,13 +196,3 @@ class ReadSchedule:
         remove(self.__file_path)
 
 
-
-
-
-a = ReadSchedule('', 'https://bb.usurt.ru/bbcswebdav/xid-20961443_1')
-shed = a.get_all_filter(datetime(2024,10,15), datetime(2024,10,15))
-
-
-for sh in shed:
-    print(sh.__dict__)
-    print('--------')
