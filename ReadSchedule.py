@@ -68,13 +68,12 @@ class ReadSchedule:
     
     def get_all(self) -> list[Shedule]:
         """:RETURNS: list of dataclass - Shedule"""
-
-        self.__get_schedule()
+        self.__get_schedule(self.__START_INDEX_ROW, self.__table.nrows)
     
     def __get_schedule(self, start_index_date: int, end_index_date: int):
         data = list()
 
-        for i_row in range(start_index, end_index):
+        for i_row in range(start_index_date, end_index_date):
             if self.__table.cell_value(i_row, self.__DATE_COL):
                 cur_date = self.__table.cell_value(i_row, self.__DATE_COL)
             
@@ -106,12 +105,9 @@ class ReadSchedule:
         return data
     
     def __get_date_interval(self):
-        end_index_date_row = self.__table.nrows
-        while self.__table.cell_value(end_index_date_row, self.__DATE_COL).isspace():
-            end_index_date_row -= 1
         
         self.date_interval = self.__str_to_date(self.__table.cell_value(self.__START_INDEX_ROW, self.__DATE_COL), self.__year),\
-        self.__str_to_date(self.__table.cell_value(end_index_date_row, self.__DATE_COL), self.__year)
+        self.__str_to_date(self.__table.cell_value(self.__table.nrows, self.__DATE_COL), self.__year)
     
     @staticmethod
     def __parse_lesson_info(cell_value: str) -> list:
