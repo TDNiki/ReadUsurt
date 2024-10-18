@@ -1,4 +1,4 @@
-import time
+from datetime import datetime
 import xlrd
 from locale import setlocale, LC_ALL
 from requests import get
@@ -9,7 +9,7 @@ from os import path, remove
 class Shedule:
     group: str
     even_week: bool
-    date_time: time.struct_time = None #may be str type if FLAG is false
+    date_time: datetime = None #may be str type if FLAG is false
     lesson_name: str = None #may contain all cell value if FLAG is false
     lesson_type: str = None
     speaker: str = None
@@ -41,7 +41,7 @@ class DateParsing_Error(ReadSchedule_Error):
 class ReadSchedule:
     """Reads excel shedule file\n\n
     :RETURNS: list of dataclass (Schedule)"""
-    date_interval: tuple[time.struct_time, time.struct_time]
+    date_interval: tuple[datetime, datetime]
     __table: xlrd.sheet.Sheet
     __DEFAULT_EXT = '.xls'
     __DEFAULT_NAME = 'Temp_Shedule'
@@ -66,13 +66,41 @@ class ReadSchedule:
         self.__head_parser() #additional info
         self.__get_date_interval() # for date sort
     
-    def get_all_filter(self, left_date: time.struct_time, right_date: time.struct_time) -> list[Shedule]:
+    def get_all_filter(self, left_date: datetime = None, right_date: datetime = None) -> list[Shedule]:
         """:RETURNS: list schedule of groups within the specified dates"""
+
+        if not left_date and not right_date: raise ReadSchedule_Error('One param needed in get_all_filter func')
+        elif left_date > right_date: raise ReadSchedule_Error('left_date cannot be > right_date')
+        elif left_date > self.date_interval[1] or right_date < self.date_interval[0]: return []
+
+        if left_date > self.date_interval[0]:
+            left_date = self.__get_index_by_date(left_date)
+        else: left_date = self.__START_INDEX_ROW
+
+        if right_date and right_date < self.date_interval[1]: right_date = self.__get_index_by_date(right_date, left_date, True)
+        else: right_date = self.__table.nrows
+
+        return self.__get_schedule(left_date, right_date)
 
     def get_all(self) -> list[Shedule]:
         """:RETURNS: list of dataclass - Shedule"""
-        self.__get_schedule(self.__START_INDEX_ROW, self.__table.nrows)
+        return self.__get_schedule(self.__START_INDEX_ROW, self.__table.nrows)
     
+    def __get_index_by_date(self, date: datetime, start: int = 3, with_end: bool = False) -> int:
+        i = start
+        if with_end:
+            while True:
+                val = self.__table.cell_value(i, self.__DATE_COL)
+                if val and self.__str_to_date(val, self.__year) > date: break
+                i += 1
+        else:
+            while True:
+                val = self.__table.cell_value(i, self.__DATE_COL)
+                if val and date == self.__str_to_date(val, self.__year): break
+                i += 1
+        
+        return i
+
     def __get_schedule(self, start_index_date: int, end_index_date: int):
         data = list()
 
@@ -108,9 +136,14 @@ class ReadSchedule:
         return data
     
     def __get_date_interval(self):
-        
+        i = 1
+        end = self.__table.cell_value(self.__table.nrows - i, self.__DATE_COL)
+        while not end:
+            i += 1
+            end = self.__table.cell_value(self.__table.nrows - i, self.__DATE_COL)
+
         self.date_interval = self.__str_to_date(self.__table.cell_value(self.__START_INDEX_ROW, self.__DATE_COL), self.__year),\
-        self.__str_to_date(self.__table.cell_value(self.__table.nrows, self.__DATE_COL), self.__year)
+        self.__str_to_date(end, self.__year)
     
     @staticmethod
     def __parse_lesson_info(cell_value: str) -> list:
@@ -129,15 +162,15 @@ class ReadSchedule:
         return info
         
     @staticmethod
-    def __str_to_date(date: str, year: str, ltime: str = None) -> time.struct_time:
+    def __str_to_date(date: str, year: str, ltime: str = None) -> datetime:
         """Convert str date information to time.struct_time"""
         try:
             day, month = date.split(maxsplit = 2)[:2]
             date =  year + ' ' + day + ' ' + month[:3] # 2024 07 окт
             if ltime:
                date += ' ' + ltime.split('-', maxsplit = 1)[0] # 2024 07 окт 08:30
-               return time.strptime(date, '%Y %d %b %H:%M')
-            return time.strptime(date, '%Y %d %b')
+               return datetime.strptime(date, '%Y %d %b %H:%M')
+            return datetime.strptime(date, '%Y %d %b')
         
         except Exception as err:
             raise DateParsing_Error(f"Can't parse date part: {err}")
@@ -166,3 +199,10 @@ class ReadSchedule:
 
 
 
+a = ReadSchedule('', 'https://bb.usurt.ru/bbcswebdav/xid-20961443_1')
+shed = a.get_all_filter(datetime(2024,10,15), datetime(2024,10,15))
+
+
+for sh in shed:
+    print(sh.__dict__)
+    print('--------')
