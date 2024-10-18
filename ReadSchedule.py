@@ -41,6 +41,7 @@ class DateParsing_Error(ReadSchedule_Error):
 class ReadSchedule:
     """Reads excel shedule file\n\n
     :RETURNS: list of dataclass (Schedule)"""
+    date_interval: tuple[time.struct_time, time.struct_time]
     __table: xlrd.sheet.Sheet
     __DEFAULT_EXT = '.xls'
     __DEFAULT_NAME = 'Temp_Shedule'
@@ -49,10 +50,12 @@ class ReadSchedule:
     __TIME_COL = 1
     __DATE_COL = 0
     __GROUP_NAME_ROW = 2
+    __START_INDEX_ROW = 3
     __even: bool
     __year: str
     __LOCALE = 'Russian'
     __file_path: str #path to temp exel file
+    
 
     def __init__(self, buffer_path: str, bb_link: str) -> None:
         if type(buffer_path) is not str or type(bb_link) is not str: raise TypeError
@@ -64,8 +67,13 @@ class ReadSchedule:
     
     def get_all(self) -> list[Shedule]:
         """:RETURNS: list of dataclass - Shedule"""
+
+        self.__get_schedule()
+    
+    def __get_schedule(self, start_index_date: int, end_index_date: int):
         data = list()
-        for i_row in range(3, self.__table.nrows):
+
+        for i_row in range(start_index, end_index):
             if self.__table.cell_value(i_row, self.__DATE_COL):
                 cur_date = self.__table.cell_value(i_row, self.__DATE_COL)
             
@@ -77,7 +85,7 @@ class ReadSchedule:
                 temp_sh = Shedule(group = self.__table.cell_value(self.__GROUP_NAME_ROW, i_col), even_week = self.__even)
                 try:
                     l_info = self.__parse_lesson_info(self.__table.cell_value(i_row, i_col))
-                    temp_sh.date_time = self.__str_to_date(cur_date, cur_time, self.__year)
+                    temp_sh.date_time = self.__str_to_date(cur_date, self.__year, cur_time)
                     temp_sh.lesson_name = l_info[0]
                     temp_sh.lesson_type = l_info[-1]
                     temp_sh.speaker = l_info[1]
@@ -96,7 +104,8 @@ class ReadSchedule:
         
         return data
     
-    
+    def __get_date_interval(self):
+
     @staticmethod
     def __parse_lesson_info(cell_value: str) -> list:
         """:RETURNS: list of parsed info; (lesson_name: str, speaker_info: str, location: str, lesson_type: str)"""
@@ -113,17 +122,19 @@ class ReadSchedule:
         
         return info
         
-
     @staticmethod
-    def __str_to_date(date: str, ltime: str, year: str) -> time.struct_time:
+    def __str_to_date(date: str, year: str, ltime: str = None) -> time.struct_time:
         """Convert str date information to time.struct_time"""
         try:
             day, month = date.split(maxsplit = 2)[:2]
-            date =  year + ' ' + day + ' ' + month[:3]  + ' ' + ltime.split('-', maxsplit = 1)[0] # 2024 07 окт 08:30
+            date =  year + ' ' + day + ' ' + month[:3] # 2024 07 окт
+            if ltime:
+               date += ' ' + ltime.split('-', maxsplit = 1)[0] # 2024 07 окт 08:30
+               return time.strptime(date, '%Y %d %b %H:%M')
+            return time.strptime(date, '%Y %d %b')
+        
         except Exception as err:
             raise DateParsing_Error(f"Can't parse date part: {err}")
-
-        return time.strptime(date, '%Y %d %b %H:%M')
     
     def __head_parser(self):
         """Header parser"""
