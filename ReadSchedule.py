@@ -66,6 +66,9 @@ class ReadSchedule:
         self.__head_parser() #additional info
         self.__get_date_interval() # for date sort
     
+    def get_all_filter(self, left_date: time.struct_time, right_date: time.struct_time) -> list[Shedule]:
+        """:RETURNS: list schedule of groups within the specified dates"""
+
     def get_all(self) -> list[Shedule]:
         """:RETURNS: list of dataclass - Shedule"""
         self.__get_schedule(self.__START_INDEX_ROW, self.__table.nrows)
