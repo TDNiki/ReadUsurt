@@ -46,3 +46,5 @@ class bb_connect:
 
         return urls
         
+a = bb_connect("https://bb.usurt.ru/bbcswebdav/xid-1180291_1")
+print(a.get_urls())
