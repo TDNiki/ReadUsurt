@@ -45,6 +45,3 @@ class bb_connect:
                 raise ParsingLinks_Error(err)
 
         return urls
-        
-a = bb_connect("https://bb.usurt.ru/bbcswebdav/xid-1180291_1")
-print(a.get_urls())

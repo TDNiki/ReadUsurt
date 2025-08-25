@@ -4,9 +4,14 @@ from locale import setlocale, LC_ALL
 from requests import get
 from dataclasses import dataclass
 from os import path, remove
+from zoneinfo import ZoneInfo
+from datetime import datetime
+
+CHANGE_YEAR = 11
+GROUP_FOR_GROUP_FLAG = 'п/г'
 
 @dataclass
-class Shedule:
+class Schedule:
     group: str
     even_week: bool
     date_time: time.struct_time = None #may be str type if FLAG is false
@@ -22,7 +27,7 @@ class Shedule:
     
 class ReadSchedule_Error(Exception):
 
-    def __init__(self, msg: str = 'Error, while reading shedule',  *args: object) -> None:
+    def __init__(self, msg: str = 'Error, while reading schedule',  *args: object) -> None:
         super().__init__(msg, *args)
 
 class Connect_Error(ReadSchedule_Error):
@@ -53,6 +58,7 @@ class ReadSchedule:
     __year: str
     __LOCALE = 'Russian'
     __file_path: str #path to temp exel file
+    __cur_pc_datetime: datetime
 
     def __init__(self, buffer_path: str, bb_link: str) -> None:
         if type(buffer_path) is not str or type(bb_link) is not str: raise TypeError
@@ -61,10 +67,14 @@ class ReadSchedule:
         self.__get_file(bb_link)
         self.__table = xlrd.open_workbook(self.__file_path).sheet_by_index(0)
         self.__head_parser() #additional info
+        self.__cur_pc_datetime = datetime.now(ZoneInfo('Asia/Yekaterinburg'))
+        self.__year = str(self.__cur_pc_datetime.year)
     
-    def get_all(self) -> list[Shedule]:
-        """:RETURNS: list of dataclass - Shedule"""
+    def get_all(self) -> list[Schedule]:
+        """:RETURNS: list of dataclass - Schedule"""
         data = list()
+        last_date: time.struct_time | None = None
+
         for i_row in range(3, self.__table.nrows):
             if self.__table.cell_value(i_row, self.__DATE_COL):
                 cur_date = self.__table.cell_value(i_row, self.__DATE_COL)
@@ -74,17 +84,34 @@ class ReadSchedule:
                 
             for i_col in range(2, self.__table.ncols):
                 if self.__table.cell_value(i_row, i_col).isspace(): continue # skips empty cell
-                temp_sh = Shedule(group = self.__table.cell_value(self.__GROUP_NAME_ROW, i_col), even_week = self.__even)
+                temp_sh = Schedule(group = self.__table.cell_value(self.__GROUP_NAME_ROW, i_col), even_week = self.__even)
                 try:
                     l_info = self.__parse_lesson_info(self.__table.cell_value(i_row, i_col))
                     temp_sh.date_time = self.__str_to_date(cur_date, cur_time, self.__year)
+
+                    
+                    if temp_sh.date_time.tm_mon - self.__cur_pc_datetime.month == CHANGE_YEAR:
+                        temp_sh.date_time.tm_year -= 1
+
+                    
+
                     temp_sh.lesson_name = l_info[0]
                     temp_sh.lesson_type = l_info[-1]
+
+                    if GROUP_FOR_GROUP_FLAG in temp_sh.lesson_type:
+                        temp_sh.lesson_type = "Л\б занятия " + temp_sh.lesson_type
+
                     temp_sh.speaker = l_info[1]
                     temp_sh.auditorium = l_info[2]
+                    
+                    if temp_sh.speaker[0] == ' ': temp_sh.speaker = temp_sh.speaker[1:]
+
+                    temp_sh.speaker = temp_sh.speaker.split(', ')[0]
+
 
                     data.append(temp_sh)
-                    
+
+
                 except DateParsing_Error:
                     temp_sh.date_time = cur_time
                     temp_sh.dparse_suc = False
@@ -107,7 +134,8 @@ class ReadSchedule:
         #-  Розенфельд Александр Семёнович, Профессор
         #-  Спорт компл.-10, Практические занятия
         try:
-            info = [i[2:] for i in cell_value.split('\n')]
+
+            info = [i.replace("- ", "", 1) for i in cell_value.split('\n')]
             if len(info) != 3: raise Parsing_Error('Enter data is not valid to parse correct')
             info.extend(info.pop().split(','))
         except Exception as err:
@@ -132,7 +160,6 @@ class ReadSchedule:
         try:
             info: list[str] = self.__table.cell_value(*self.__HEAD_COORDS).split()
             self.__even = not self.__EWEEK_RUS[info[-1].lower()]
-            self.__year = info[-2].split('/')[0]
         except Exception as err:
             raise Parsing_Error(f"Can't parse header part: {err}")
 
@@ -148,6 +175,3 @@ class ReadSchedule:
         remove(self.__file_path)
 
 
-
-
-a = ReadSchedule('', 'https://bb.usurt.ru/bbcswebdav/institution/%D0%A0%D0%B0%D1%81%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5/%D0%9E%D1%87%D0%BD%D0%B0%D1%8F%20%D1%84%D0%BE%D1%80%D0%BC%D0%B0%20%D0%BE%D0%B1%D1%83%D1%87%D0%B5%D0%BD%D0%B8%D1%8F/%D0%9D%D0%B5%D1%87%D0%B5%D1%82%D0%BD%D0%B0%D1%8F%20%D0%BD%D0%B5%D0%B4%D0%B5%D0%BB%D1%8F/%D0%AD%D0%BB%D0%B5%D0%BA%D1%82%D1%80%D0%BE%D1%82%D0%B5%D1%85%D0%BD%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B8%D0%B9%20%D1%84%D0%B0%D0%BA%D1%83%D0%BB%D1%8C%D1%82%D0%B5%D1%82/%D0%AD%D0%A2%D0%A4%205%20%D0%BA%D1%83%D1%80%D1%81%20%20%D0%BD%D0%B5%D1%87%D0%B5%D1%82%D0%BD%D0%B0%D1%8F.xls')
