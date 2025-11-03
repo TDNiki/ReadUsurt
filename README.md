@@ -5,8 +5,6 @@ This project is licensed under the Creative Commons Attribution-NonCommercial 3.
 Old version of project. New will be soon
 
 
-# Use Guide
-
 ## BBrequest
 
 1. Создайте экземпляр класса, указав в качестве параметра корневую папку расписания. ВАЖНО, чтоб эта папка была общедоступной. Пример: "https://bb.usurt.ru/bbcswebdav/xid-1180291_1"
