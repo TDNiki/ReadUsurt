@@ -1,4 +1,5 @@
 from requests_html import HTMLSession as Session
+from requests_html import HtmlElement, Element
 
 class bb_connect_Error(Exception):
     def __init__(self, *args: object) -> None:
@@ -12,7 +13,8 @@ class bb_connect:
     """Gets all url .xls from url directory"""
 
     __EXT_EXCEL = '.xls'
-    __FIND_PARAM = '[id$="xythosFileAnchor"]' 
+    __FIND_PARAM_LINK = ' > th[scope="row"] > a[id$="or"]'
+    __FIND_PARAM_BASE = 'tbody[id="listContainer_databody"] > tr'
     
     def __init__(self, bb_link: str) -> None:
         if type(bb_link) is not str: raise TypeError('Param bb_link must be str type')
@@ -28,15 +30,18 @@ class bb_connect:
         urls = list()
         ses = Session()
         #cur_get.html: HTML
-        elements = ses.get(self.bb_link).html.find(self.__FIND_PARAM)
+        elements = ses.get(self.bb_link).html.find(self.__FIND_PARAM_BASE + self.__FIND_PARAM_LINK)
 
         while len(elements):
             try:
                 link: str = elements[0].absolute_links.pop() #absolute_links: set; must be only one link in set
                 if link.endswith(self.__EXT_EXCEL):
-                    urls.append(link)
+                    
+                    parent: HtmlElement = elements[0].element.getparent().getparent()
+                    date = parent.find('td[3]/span[2]').text # прямой путь от td до даты. Костыль, больше несоветуют htmlelement использовать для поиска элементов
+                    urls.append((elements[0].text, date, link))
                 else:
-                    elements.extend(ses.get(link).html.find(self.__FIND_PARAM)) #merge lists
+                    elements.extend(ses.get(link).html.find(self.__FIND_PARAM_BASE + self.__FIND_PARAM_LINK)) #merge lists
                 elements.pop(0)
 
             except KeyError:
