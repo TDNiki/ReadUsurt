@@ -1,3 +1,7 @@
+// Licensed under Creative Commons Attribution-NonCommercial 3.0 Unported
+// https://creativecommons.org/licenses/by-nc/3.0/
+// (c) Tsygankov Nikita, 2025
+
 import tempfile
 import xlrd
 from requests import get
@@ -193,6 +197,7 @@ class ReadSchedule:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.buffer_path.cleanup()
+
 
 
 
