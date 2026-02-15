@@ -1,6 +1,6 @@
-// Licensed under Creative Commons Attribution-NonCommercial 3.0 Unported
-// https://creativecommons.org/licenses/by-nc/3.0/
-// (c) Tsygankov Nikita, 2025
+# Licensed under Creative Commons Attribution-NonCommercial 3.0 Unported
+# https://creativecommons.org/licenses/by-nc/3.0/
+# (c) Tsygankov Nikita, 2025
 
 from requests_html import HTMLSession as Session
 from requests_html import HtmlElement, Element
