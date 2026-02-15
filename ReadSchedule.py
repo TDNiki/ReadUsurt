@@ -1,6 +1,6 @@
-// Licensed under Creative Commons Attribution-NonCommercial 3.0 Unported
-// https://creativecommons.org/licenses/by-nc/3.0/
-// (c) Tsygankov Nikita, 2025
+# Licensed under Creative Commons Attribution-NonCommercial 3.0 Unported
+# https://creativecommons.org/licenses/by-nc/3.0/
+# (c) Tsygankov Nikita, 2025
 
 import tempfile
 import xlrd
@@ -11,11 +11,14 @@ from zoneinfo import ZoneInfo
 from datetime import datetime
 
 
-CHANGE_YEAR = 11
+
+MONTH_SEP = 9
+MONTH_DEC = 12
 GROUP_FOR_GROUP_FLAG = 'п/г'
 
 @dataclass
 class Schedule:
+    faculty: str
     group: str
     even_week: bool
     date_time: datetime = None #may be str type if FLAG is false
@@ -23,9 +26,7 @@ class Schedule:
     lesson_type: str = None
     speaker: str = None
     auditorium: str = None
-    dparse_suc: bool = True #FLAG Successful parsing;
     parse_suc: bool = True #FLAG Successful parsing;
-    #default = None, bcs I need init class without params and add them before 
     def __repr__(self) -> str:
         return f"{self.group}: {self.lesson_name}"
     
@@ -55,12 +56,12 @@ class ReadSchedule:
     __DEFAULT_NAME = 'Temp_Shedule'
     __EWEEK_RUS = {'нечетная': 1, 'четная': 0}
     __HEAD_COORDS = (1, 0) #row col
+    __FACULTY_COORDS = (0, 0)
     __TIME_COL = 1
     __DATE_COL = 0
     __GROUP_NAME_ROW = 2
-    __year: str
-    __file_path: str #path to temp exel file
     __cur_pc_datetime: datetime
+    __file_path: str #path to temp exel file
     __months_EN_RU= {
             'янв': 'Jan', 'фев': 'Feb', 'мар': 'Mar', 'апр': 'Apr',
             'май': 'May', 'июн': 'Jun', 'июл': 'Jul', 'авг': 'Aug',
@@ -70,24 +71,25 @@ class ReadSchedule:
 
     def __init__(self, bb_link: str) -> None:
         if type(bb_link) is not str or bb_link == '': raise TypeError
+        self.bb_link = bb_link
         buffer_path = tempfile.TemporaryDirectory()
         self.__file = buffer_path.name
         self.buffer_path = buffer_path
         self.__get_file(bb_link)
+        
         self.__table = xlrd.open_workbook(self.__file_path)
         self.__cur_pc_datetime = datetime.now(ZoneInfo('Asia/Yekaterinburg'))
-        self.__year = str(self.__cur_pc_datetime.year)
     
     def get_all(self, date_start_scan: datetime = None) -> list[Schedule]:
         """:RETURNS: list of dataclass - Schedule"""
-        if date_start_scan is not datetime: date_start_scan = self.__cur_pc_datetime
+        if not date_start_scan: date_start_scan = self.__cur_pc_datetime
 
         data = list()
         sheet_count = self.__table.nsheets
          #additional info
         for sh in range(sheet_count):
             tb = self.__table.sheet_by_index(sh)
-            even = self.__head_parser(tb)
+            header = self.__head_parser(tb)
             for i_row in range(3, tb.nrows):
                 if tb.cell_value(i_row, self.__DATE_COL):
                     cur_date = tb.cell_value(i_row, self.__DATE_COL)
@@ -96,20 +98,18 @@ class ReadSchedule:
                     cur_time = tb.cell_value(i_row, self.__TIME_COL)
                     
                 for i_col in range(2, tb.ncols):
-                    if tb.cell_value(i_row, i_col).isspace(): continue # skips empty cell
+                    if tb.cell_value(i_row, i_col).isspace() or not tb.cell_value(i_row, i_col): continue # skips empty cell
+                    
                     
                     try:
-                        date_time = self.__str_to_date(cur_date, cur_time, self.__year)
 
-                        
-
-                        if date_time.month - self.__cur_pc_datetime.month == CHANGE_YEAR:
-                            date_time.replace(year= date_time.year - 1)
+                        year = header[2] if MONTH_SEP <= self.__determine_year(cur_date) <= MONTH_DEC else header[3]
+                        date_time = self.__str_to_date(cur_date, cur_time, year)
 
                         if date_time.date() < date_start_scan.date():
                             continue
 
-                        temp_sh = Schedule(group = tb.cell_value(self.__GROUP_NAME_ROW, i_col), even_week = even)
+                        temp_sh = Schedule(group = tb.cell_value(self.__GROUP_NAME_ROW, i_col), even_week = header[0], faculty = header[1])
                         temp_sh.date_time = date_time
 
                         l_info = self.__parse_lesson_info(tb.cell_value(i_row, i_col))
@@ -125,18 +125,21 @@ class ReadSchedule:
                             if GROUP_FOR_GROUP_FLAG in temp_sh.lesson_type:
                                 temp_sh.lesson_type = "Л\б занятия " + temp_sh.lesson_type
 
+                            if l_info[1].isspace():
+                                temp_sh.parse_suc = False
+                                
                             temp_sh.speaker = l_info[1]
                             temp_sh.auditorium = l_info[2]
                             
-                            if temp_sh.speaker[0] == ' ': temp_sh.speaker = temp_sh.speaker[1:]
 
                             temp_sh.speaker = temp_sh.speaker.split(', ')[0]
+                            
 
 
                         data.append(temp_sh)
 
 
-                    except DateParsing_Error:
+                    except DateParsing_Error as er:
                         self.corrupted_data += 1
                         continue
                     except Exception as err:
@@ -156,18 +159,36 @@ class ReadSchedule:
         #-  Спорт компл.-10, Практические занятия
         try:
 
-            info = [i.replace("- ", "", 1) for i in cell_value.split('\n')]
+            info = []
+            for i in cell_value.split('\n'):
+                limit = len(i)
+                while i[0].isalpha() == False and limit > 1:
+                    i = i[1:]
+                    limit -= 1
+                
+                info.append(i)
+
             if len(info) != 3: return None
             info.extend(info.pop().split(','))
         except Exception as err:
             raise Parsing_Error(f"Can't parse lesson_info part: {err}")
         
         return info
-        
+    
+
+
+    def __determine_year(self, parsed_date: str) -> int:
+        try:
+            month_rus = parsed_date.split(maxsplit=2)[1][:3].lower()
+            month_num = list(self.__months_EN_RU.keys()).index(month_rus) + 1
+
+            return month_num
+        except:
+            raise DateParsing_Error("Can't determine year")
 
 
     def __str_to_date(self, date: str, ltime: str, year: str) -> datetime:
-        """Convert str date information to time.struct_time"""
+        """Convert str date information to datetime"""
 
 
 
@@ -179,11 +200,15 @@ class ReadSchedule:
 
         return datetime.strptime(date, '%Y %d %b %H:%M').replace(tzinfo = ZoneInfo('Asia/Yekaterinburg'))
     
-    def __head_parser(self, table):
+    def __head_parser(self, table) -> tuple[int, str, int, int]:
         """Header parser"""
         try:
-            info: list[str] = table.cell_value(*self.__HEAD_COORDS).split()
-            return not self.__EWEEK_RUS[info[-1].lower()]
+            header = table.cell_value(*self.__HEAD_COORDS).split()
+            even = header[-1]
+            even = not self.__EWEEK_RUS[even.lower()]
+            year_start, year_end = header[-2].split('/', 1)
+
+            return even, table.cell_value(*self.__FACULTY_COORDS), year_start, year_end
         except Exception as err:
             raise Parsing_Error(f"Can't parse header part: {err}")
 
@@ -197,6 +222,8 @@ class ReadSchedule:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.buffer_path.cleanup()
+
+
 
 
 
